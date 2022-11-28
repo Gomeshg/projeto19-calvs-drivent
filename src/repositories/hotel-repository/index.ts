@@ -1,29 +1,21 @@
 import { prisma } from "@/config";
 import { Hotel, Room, Booking } from "@prisma/client";
 
-async function findHotels() {
+async function findAllHotelsInfo() {
   return prisma.hotel.findMany();
 }
 
-async function findHotelById(hotelId: number) {
-  return prisma.hotel.findFirst({
-    where: { id: hotelId }
-  });
-}
-
 async function findRoomByHotelId(hotelId: number) {
-  return prisma.hotel.findMany({
-    where: { id: hotelId },
-    include: {
-      Rooms: true
-    }
+  return prisma.room.findMany({
+    where: { hotelId: hotelId },
+    
   });
 }
+export type PaymentParams = Omit<Hotel, "id" | "createdAt" | "updatedAt">
 
 const hotelRepository = {
-  findHotels,
-  findHotelById,
+  findAllHotelsInfo,
   findRoomByHotelId
 };
 
-export default hotelRepository; 
+export default hotelRepository;
