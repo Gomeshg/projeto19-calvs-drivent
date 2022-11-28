@@ -1,35 +1,76 @@
 import ticketService from "../tickets-service";
 import hotelRepository from "@/repositories/hotel-repository";
 
-import { notFoundError, conflictError } from "@/errors";
+import { notFoundError, conflictError, noContentError } from "@/errors";
 import { exclude } from "@/utils/prisma-utils";
 import { Hotel, Room, Booking } from "@prisma/client";
+import enrollmentRepository from "@/repositories/enrollment-repository";
+import ticketRepository from "@/repositories/ticket-repository";
 
 async function getHotels(userId: number) {
-  const userTicked = await ticketService.getTicketByUserId(userId);
+  const enrollment = await enrollmentRepository.findWithAddressByUserId(userId);
 
-  if(!userTicked) {
+  if (!enrollment) {
+    throw noContentError();
+  }
+
+  const ticket = await ticketRepository.findTicketByEnrollmentId(enrollment.id);
+  const ticketTypes = await ticketRepository.findTicketTypes();
+  const ticketTypeWithHotel = ticketTypes.filter(type => type.includesHotel);
+
+  if (!ticket) {
+    throw notFoundError();
+  } else if(ticket.status!=="PAID" || ticket.ticketTypeId !== ticketTypeWithHotel[0].id) {
     throw notFoundError();
   }
 
-  if(!userTicked.TicketType.includesHotel) throw notFoundError();
-    
-  if(userTicked.status === "RESERVED") throw conflictError("Paid firts engraçadinho! "); 
-    
-  if(userTicked.TicketType.isRemote) throw conflictError("Tá em casa!");
-
   const hotels = await hotelRepository.findAllHotelsInfo();
+
   return hotels;
 }
 
-async function getRoomByHotelId(hotelId: number) {
-  const room = await hotelRepository.findRoomByHotelId(hotelId);
+async function getRoomByHotelId(userId: number, hotelId: number) {
+  const enrollment = await enrollmentRepository.findWithAddressByUserId(userId);
 
-  if(!room) {
+  if (!enrollment) {
+    throw noContentError();
+  }
+
+  const ticket = await ticketRepository.findTicketByEnrollmentId(enrollment.id);
+  const ticketTypes = await ticketRepository.findTicketTypes();
+  const ticketTypeWithHotel = ticketTypes.filter(type => type.includesHotel);
+
+  if (!ticket) {
+    throw notFoundError();
+  } else if(ticket.status!=="PAID" || ticket.ticketTypeId !== ticketTypeWithHotel[0].id) {
     throw notFoundError();
   }
 
-  return room;
+  const hotels = await hotelRepository.findAllHotelsInfo();
+  if (hotels.length===0) {
+    return hotels;
+  }
+
+  const hotel = hotels.filter(hotel => hotel.id===hotelId);
+  if (hotel.length===0) {
+    throw badRequestError();
+  }
+
+  const hotelInfo = hotel[0];
+
+  const hotelRooms = await hotelRepository.findRoomByHotelId(hotelId);
+  if (hotelRooms.length===0) {
+    return hotelRooms;
+  }
+
+  return {
+    id: hotelInfo.id,
+    name: hotelInfo.name,
+    image: hotelInfo.image,
+    createdAt: hotelInfo.createdAt,
+    updatedAt: hotelInfo.updatedAt,
+    Rooms: hotelRooms
+  };
 }
 
 const hotelService = {
