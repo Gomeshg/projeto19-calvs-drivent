@@ -18,7 +18,7 @@ async function getHotels(userId: number) {
     
   if(userTicked.TicketType.isRemote) throw conflictError("Tá em casa!");
 
-  const hotels = await hotelRepository.findHotels();
+  const hotels = await hotelRepository.findAllHotelsInfo();
   return hotels;
 }
 
